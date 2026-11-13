@@ -1,17 +1,18 @@
 // 웹 푸시 보내기 (RFC 8291 암호화 + RFC 8292 VAPID). 외부 라이브러리 없이 Web Crypto만 사용.
 const enc = new TextEncoder();
+type Bytes = Uint8Array<ArrayBuffer>;
 export const b64u = (b: ArrayBuffer | Uint8Array) =>
   btoa(String.fromCharCode(...new Uint8Array(b as ArrayBuffer))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-export const unb64u = (s: string) => {
+export const unb64u = (s: string): Bytes => {
   const t = s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4);
   return Uint8Array.from(atob(t), (c) => c.charCodeAt(0));
 };
-const cat = (...a: Uint8Array[]) => {
+const cat = (...a: Uint8Array[]): Bytes => {
   const o = new Uint8Array(a.reduce((n, x) => n + x.length, 0));
   let i = 0; for (const x of a) { o.set(x, i); i += x.length; }
   return o;
 };
-async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, len: number) {
+async function hkdf(salt: Bytes, ikm: Bytes, info: Bytes, len: number): Promise<Bytes> {
   const key = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
   return new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, key, len * 8));
 }
