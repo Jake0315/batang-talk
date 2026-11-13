@@ -5,5 +5,6 @@ create function auth.uid() returns uuid language sql stable as $$ select nullif(
 create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true),''),'{}')::jsonb $$;
 grant usage on schema auth to authenticated, anon, service_role;
 grant usage on schema public to authenticated, anon, service_role;
-alter default privileges in schema public grant all on tables to authenticated, anon, service_role;
+-- 2026-05-30 이후 새 Supabase 프로젝트처럼, 새 표를 API 역할에 자동으로 열어 주지 않아요.
+-- (schema.sql이 필요한 권한을 직접 줘야 점검이 통과해요)
 create publication supabase_realtime;

@@ -5,12 +5,15 @@
  *  - 자동 작업: Supabase 깨우기(3일), 메시지 백업(매일), 드라이브 권한 맞추기(매시간), 용량 점검(매주)
  *
  * [프로젝트 설정 → 스크립트 속성]에 아래 6개를 넣어 주세요. (코드에 직접 적지 마세요)
- *   SUPABASE_URL          예) https://abcd.supabase.co
- *   SUPABASE_ANON_KEY     공개 키 (anon / publishable)
- *   SUPABASE_SERVICE_KEY  관리자 키 (service_role / secret) ← 절대 공유 금지
- *   ROOT_FOLDER_ID        파일을 모을 드라이브 폴더 ID
- *   BACKUP_SHEET_ID       백업용 구글 시트 ID
- *   ADMIN_EMAIL           경고 메일 받을 주소
+ *   SUPABASE_URL      예) https://abcd.supabase.co
+ *   SUPABASE_KEY      공개 키 (sb_publishable_… 또는 예전 anon 키)
+ *   ROBOT_KEY         로봇 비밀번호 — Supabase robot_key 표에 넣은 것과 같은 값 ← 절대 공유 금지
+ *   ROOT_FOLDER_ID    파일을 모을 드라이브 폴더 ID
+ *   BACKUP_SHEET_ID   백업용 구글 시트 ID
+ *   ADMIN_EMAIL       경고 메일 받을 주소
+ * Supabase 관리자 키(secret / service_role)는 여기에 넣지 않아요.
+ * 새 관리자 키는 Apps Script에서 막히고(브라우저로 보임), 예전 키는 2026년 말까지 없어질 예정이라
+ * 자동 작업은 로봇 비밀번호로 robot_… 함수만 불러요.
  */
 var P = PropertiesService.getScriptProperties();
 function prop(k) { var v = P.getProperty(k); if (!v) throw new Error('스크립트 속성이 없어요: ' + k); return v; }
@@ -34,24 +37,32 @@ function doPost(e) {
 function out(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 
 /* ───────── Supabase 호출 ───────── */
+function pubKey() { return P.getProperty('SUPABASE_KEY') || prop('SUPABASE_ANON_KEY'); }   // 예전 이름도 받아 줌
 // 회원 본인의 로그인 증명(token)으로 부르면 DB 보안 규칙이 그대로 적용돼요.
 function sbUser(path, token) {
   var r = UrlFetchApp.fetch(prop('SUPABASE_URL') + path, {
-    headers: { apikey: prop('SUPABASE_ANON_KEY'), Authorization: 'Bearer ' + token }, muteHttpExceptions: true
+    headers: { apikey: pubKey(), Authorization: 'Bearer ' + token }, muteHttpExceptions: true
   });
   return r.getResponseCode() === 200 ? JSON.parse(r.getContentText()) : null;
 }
-// 관리자 키: 자동 작업에서만 사용
-function sbAdmin(path, opt) {
-  opt = opt || {};
-  var key = prop('SUPABASE_SERVICE_KEY');
-  var r = UrlFetchApp.fetch(prop('SUPABASE_URL') + path, {
-    method: opt.method || 'get', contentType: 'application/json', payload: opt.payload,
-    headers: { apikey: key, Authorization: 'Bearer ' + key }, muteHttpExceptions: true
+// 자동 작업: 공개 키 + 로봇 비밀번호로 robot_… 함수만 불러요.
+function robot(fn, args) {
+  var key = pubKey(), h = { apikey: key };
+  if (/^eyJ/.test(key)) h.Authorization = 'Bearer ' + key;   // 예전 anon 키(JWT)일 때만
+  var payload = { p_key: prop('ROBOT_KEY') };
+  Object.keys(args || {}).forEach(function (k) { payload[k] = args[k]; });
+  var r = UrlFetchApp.fetch(prop('SUPABASE_URL') + '/rest/v1/rpc/' + fn, {
+    method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), headers: h, muteHttpExceptions: true
   });
   if (r.getResponseCode() >= 300) throw new Error('Supabase ' + r.getResponseCode() + ': ' + r.getContentText().slice(0, 200));
   var t = r.getContentText();
   return t ? JSON.parse(t) : null;
+}
+// 처음 설정할 때 편집기에서 실행해 보세요. '연결 성공'이 나오면 공개 키와 로봇 비밀번호가 맞아요.
+function testConnection() {
+  var ch = robot('robot_channels');
+  var msg = '연결 성공: 채널 ' + ch.length + '개 (' + ch.map(function (c) { return '#' + c.name; }).join(', ') + ')';
+  console.log(msg); return msg;
 }
 function verifyUser(token) {
   if (!token) return null;
@@ -77,8 +88,8 @@ function channelFolder(channelId) {
   var it = root.getFoldersByName(channelId);
   if (it.hasNext()) return it.next();
   var f = root.createFolder(channelId);
-  var ch = sbAdmin('/rest/v1/channels?select=name&id=eq.' + channelId);
-  f.setDescription('Batang 채널: ' + (ch && ch[0] ? ch[0].name : ''));
+  var ch = robot('robot_channels').filter(function (c) { return c.id === channelId; })[0];
+  f.setDescription('Batang 채널: #' + (ch ? ch.name : ''));
   syncDrivePermissions();
   return f;
 }
@@ -119,12 +130,12 @@ function setup() {
 }
 
 // 무료 Supabase는 1주일 동안 요청이 없으면 멈추므로 3일마다 한 번 불러 줘요.
-function keepAlive() { sbAdmin('/rest/v1/channels?select=id&limit=1'); }
+function keepAlive() { robot('robot_channels'); }
 
 // 드라이브 채널 폴더의 보기 권한을 회원 명단과 똑같이 맞춰요. (링크 공개 없음, 공유 알림 메일 없음)
 function syncDrivePermissions() {
-  var channels = sbAdmin('/rest/v1/channels?select=id,name');
-  var allow = sbAdmin('/rest/v1/allowlist?select=email,channels');
+  var channels = robot('robot_channels');
+  var allow = robot('robot_allowlist');
   var root = DriveApp.getFolderById(prop('ROOT_FOLDER_ID'));
   channels.forEach(function (c) {
     var it = root.getFoldersByName(c.id);
@@ -154,16 +165,12 @@ function backupMessages() {
   if (sh.getLastRow() === 0) sh.appendRow(HEAD);
   var since = P.getProperty('BACKUP_SINCE') || '2000-01-01T00:00:00Z';
   var now = new Date().toISOString();
-  var names = {}; sbAdmin('/rest/v1/members?select=id,name').forEach(function (m) { names[m.id] = m.name; });
-  var chans = {}; sbAdmin('/rest/v1/channels?select=id,name').forEach(function (c) { chans[c.id] = c.name; });
-  var sel = 'select=id,created_at,channel_id,sender_id,parent_id,body,edited_at,deleted_at,attachments(name)';
-  var q = encodeURIComponent(since);
-  var fresh = pageAll('/rest/v1/messages?' + sel + '&deleted_at=is.null&created_at=gt.' + q + '&order=created_at');
-  var edited = pageAll('/rest/v1/messages?' + sel + '&deleted_at=is.null&edited_at=gt.' + q + '&created_at=lte.' + q);
-  var deleted = pageAll('/rest/v1/messages?select=id&deleted_at=gt.' + q);
+  var names = {}; robot('robot_members').forEach(function (m) { names[m.id] = m.name; });
+  var chans = {}; robot('robot_channels').forEach(function (c) { chans[c.id] = '#' + c.name; });
+  var fresh = pageAll('fresh', since), edited = pageAll('edited', since), deleted = pageAll('deleted', since);
   function row(m) {
     return [m.id, Utilities.formatDate(new Date(m.created_at), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss'), chans[m.channel_id] || '',
-      names[m.sender_id] || '', m.parent_id || '', m.body, (m.attachments || []).map(function (a) { return a.name; }).join(', '),
+      names[m.sender_id] || '', m.parent_id || '', m.body, m.files || '',
       m.edited_at ? Utilities.formatDate(new Date(m.edited_at), 'Asia/Seoul', 'yyyy-MM-dd HH:mm:ss') : ''];
   }
   if (edited.length || deleted.length) {
@@ -176,10 +183,10 @@ function backupMessages() {
   if (fresh.length) sh.getRange(sh.getLastRow() + 1, 1, fresh.length, HEAD.length).setValues(fresh.map(row));
   P.setProperty('BACKUP_SINCE', now);
 }
-function pageAll(path) {
+function pageAll(kind, since) {
   var all = [], step = 1000;
   for (var off = 0; ; off += step) {
-    var part = sbAdmin(path + '&limit=' + step + '&offset=' + off);
+    var part = robot('robot_messages', { p_kind: kind, p_since: since, p_limit: step, p_offset: off });
     all = all.concat(part);
     if (part.length < step) return all;
   }
@@ -187,7 +194,7 @@ function pageAll(path) {
 
 // 매주: DB·드라이브 용량 확인, 기준을 넘으면 메일
 function weeklyCheck() {
-  var mb = Number(sbAdmin('/rest/v1/rpc/db_size_mb', { method: 'post', payload: '{}' }));
+  var mb = Number(robot('robot_db_size_mb'));
   var used = DriveApp.getStorageUsed(), limit = DriveApp.getStorageLimit();
   var warn = [];
   if (mb >= 400) warn.push('DB 용량이 ' + mb + 'MB예요 (무료 한도 500MB). 오래된 메시지를 정리할 때예요.');

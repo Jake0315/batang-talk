@@ -70,6 +70,14 @@ select delete_message(:'m2');
 select t_ok((select body = '' and deleted_at is not null from messages where id = :'m2'), '관리자는 남의 메시지 삭제 가능');
 reset role;
 
+-- 4-0) 표 권한: 앱이 표를 직접 고치지 못하고 함수로만 바꿈
+select t_login('plan.member@gmail.com'); set role authenticated;
+select t_fails($$update messages set body = '몰래 수정'$$, '메시지 직접 수정 불가(권한 없음)');
+select t_fails($$delete from messages$$, '메시지 직접 삭제 불가(권한 없음)');
+select t_fails($$update allowlist set role = 'admin'$$, '명단 직접 수정 불가(권한 없음)');
+select t_fails($$update channel_members set notify = 'all'$$, '구성원 표 직접 수정 불가(권한 없음)');
+reset role;
+
 -- 4-1) 채널 추가: 관리자만, 이름은 '#' 없이 저장
 select t_login('plan.member@gmail.com'); set role authenticated;
 select t_fails($$select create_channel('몰래방', false, '{}')$$, '일반 회원은 채널 추가 못 함');
@@ -106,6 +114,24 @@ reset role;
 
 -- 6) 로그인하지 않은 접근
 set role anon;
-select t_ok((select count(*) = 0 from messages) and (select count(*) = 0 from allowlist) and (select count(*) = 0 from members), '비로그인은 아무것도 못 읽음');
+select t_fails($$select count(*) from messages$$, '비로그인은 메시지를 아예 못 읽음(권한 없음)');
+select t_fails($$select count(*) from allowlist$$, '비로그인은 명단을 아예 못 읽음(권한 없음)');
+select t_fails($$select count(*) from members$$, '비로그인은 회원 목록을 아예 못 읽음(권한 없음)');
+select t_fails($$select count(*) from channels$$, '비로그인은 채널을 아예 못 읽음(권한 없음)');
+select t_fails($$select * from robot_key$$, '비로그인은 로봇 비밀번호 표를 못 읽음');
+select t_fails($$select * from robot_channels('틀린비밀번호틀린비밀번호틀린비밀번호틀린')$$, '틀린 로봇 비밀번호는 거절');
+select t_fails($$select * from robot_channels(null)$$, '빈 로봇 비밀번호는 거절');
+select t_fails($$select * from robot_messages('x', 'fresh', '2000-01-01', 10, 0)$$, '로봇 비밀번호 없이 메시지 못 꺼냄');
+reset role;
+insert into robot_key (secret) values ('test-robot-key-0123456789-abcdefghijklmnop') on conflict (id) do update set secret = excluded.secret;
+set role anon;
+select t_ok((select count(*) = 8 from robot_channels('test-robot-key-0123456789-abcdefghijklmnop')), '맞는 로봇 비밀번호면 채널 목록을 줌');
+select t_ok((select count(*) >= 1 from robot_messages('test-robot-key-0123456789-abcdefghijklmnop', 'fresh', '2000-01-01', 1000, 0)), '로봇: 백업용 새 메시지');
+select t_ok((select bool_and(body = '') from robot_messages('test-robot-key-0123456789-abcdefghijklmnop', 'deleted', '2000-01-01', 1000, 0)), '로봇: 지운 글은 내용 없이 id만');
+select t_ok((select robot_db_size_mb('test-robot-key-0123456789-abcdefghijklmnop') > 0), '로봇: 용량 확인');
+select t_fails($$select robot_ok('test-robot-key-0123456789-abcdefghijklmnop')$$, '비밀번호 확인 함수는 직접 못 부름');
+reset role;
+select t_login('jake.example@gmail.com'); set role authenticated;
+select t_fails($$select * from robot_key$$, '관리자 계정도 앱에서는 로봇 비밀번호를 못 읽음');
 reset role;
 \echo ALL PASS

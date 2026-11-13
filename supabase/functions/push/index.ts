@@ -5,7 +5,17 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendPush, type Sub } from "./webpush.ts";
 
 const env = (k: string) => Deno.env.get(k) ?? "";
-const admin = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
+// 관리자 키: 새 방식(SUPABASE_SECRET_KEYS의 default)을 먼저 쓰고, 없으면 예전 service_role 키를 써요.
+// Supabase가 예전 키(anon·service_role)를 2026년 말까지 없애기로 해서 둘 다 받게 했어요.
+function adminKey(): string {
+  try {
+    const keys = JSON.parse(env("SUPABASE_SECRET_KEYS") || "{}") as Record<string, string>;
+    const k = keys["default"] ?? Object.values(keys)[0];
+    if (k) return k;
+  } catch { /* 아래 예전 키로 */ }
+  return env("SUPABASE_SERVICE_ROLE_KEY");
+}
+const admin = createClient(env("SUPABASE_URL"), adminKey(), { auth: { persistSession: false } });
 const vapid = {
   publicKey: env("VAPID_PUBLIC_KEY"),
   privateKey: env("VAPID_PRIVATE_KEY"),

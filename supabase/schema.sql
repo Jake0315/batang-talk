@@ -12,6 +12,12 @@ create table if not exists allowlist (
   role     text not null default 'member' check (role in ('admin','staff','member')),
   channels text[] not null default '{}'          -- 들어갈 채널 이름 목록
 );
+-- Apps Script(자동 작업)용 로봇 비밀번호. 이 표는 어떤 API로도 읽을 수 없어요(RLS, 규칙 없음).
+-- SQL Editor에서만 넣어요: insert into robot_key (secret) values ('긴 무작위 글자') on conflict (id) do update set secret = excluded.secret;
+create table if not exists robot_key (
+  id     int primary key default 1 check (id = 1),
+  secret text not null check (char_length(secret) >= 32)
+);
 create table if not exists members (
   id         uuid primary key references auth.users on delete cascade,
   email      text unique not null,
@@ -308,12 +314,75 @@ $$;
 create or replace function db_size_mb() returns numeric language sql security definer set search_path = public
   as $$ select round(pg_database_size(current_database()) / 1048576.0, 1) $$;
 
+-- ---------- Apps Script 자동 작업용 (관리자 키 없이 로봇 비밀번호로) ----------
+-- Supabase의 새 관리자 키(sb_secret_)는 Apps Script에서 쓸 수 없고, 예전 service_role 키는 없어질 예정이라
+-- Apps Script는 공개 키 + 로봇 비밀번호로 아래 함수만 불러요. 비밀번호가 틀리면 아무것도 안 줘요.
+create or replace function robot_ok(p_key text) returns void language plpgsql stable security definer set search_path = public as $$
+begin
+  if p_key is null or char_length(p_key) < 32 or not exists (select 1 from robot_key where secret = p_key) then
+    raise exception 'forbidden';
+  end if;
+end $$;
+create or replace function robot_channels(p_key text) returns table (id uuid, name text)
+  language plpgsql stable security definer set search_path = public as $$
+begin perform robot_ok(p_key); return query select c.id, c.name from channels c; end $$;
+create or replace function robot_allowlist(p_key text) returns table (email text, channels text[])
+  language plpgsql stable security definer set search_path = public as $$
+begin perform robot_ok(p_key); return query select a.email, a.channels from allowlist a; end $$;
+create or replace function robot_members(p_key text) returns table (id uuid, name text)
+  language plpgsql stable security definer set search_path = public as $$
+begin perform robot_ok(p_key); return query select m.id, m.name from members m; end $$;
+-- 백업용 메시지: kind = 'fresh'(새 글) / 'edited'(고친 글) / 'deleted'(지운 글 id)
+create or replace function robot_messages(p_key text, p_kind text, p_since timestamptz, p_limit int, p_offset int)
+  returns table (id uuid, created_at timestamptz, channel_id uuid, sender_id uuid, parent_id uuid,
+                 body text, edited_at timestamptz, files text)
+  language plpgsql stable security definer set search_path = public as $$
+begin
+  perform robot_ok(p_key);
+  return query
+    select m.id, m.created_at, m.channel_id, m.sender_id, m.parent_id,
+           case when p_kind = 'deleted' then '' else m.body end, m.edited_at,
+           case when p_kind = 'deleted' then '' else
+             coalesce((select string_agg(a.name, ', ' order by a.name) from attachments a where a.message_id = m.id), '') end
+    from messages m
+    where case p_kind
+      when 'fresh'   then m.deleted_at is null and m.created_at > p_since
+      when 'edited'  then m.deleted_at is null and m.edited_at > p_since and m.created_at <= p_since
+      when 'deleted' then m.deleted_at > p_since
+      else false end
+    order by m.created_at, m.id
+    limit least(greatest(coalesce(p_limit, 1000), 1), 1000) offset greatest(coalesce(p_offset, 0), 0);
+end $$;
+create or replace function robot_db_size_mb(p_key text) returns numeric
+  language plpgsql stable security definer set search_path = public as $$
+begin perform robot_ok(p_key); return round(pg_database_size(current_database()) / 1048576.0, 1); end $$;
+
 revoke execute on all functions in schema public from public, anon;
 grant execute on all functions in schema public to authenticated, service_role;
 revoke execute on function db_size_mb() from authenticated;
 revoke execute on function handle_new_user(), sync_allowlist(), before_message_insert(), after_message_insert() from authenticated;
+-- 로봇 함수는 공개 키(anon)로 부를 수 있지만, 안에서 로봇 비밀번호를 확인해요
+revoke execute on function robot_ok(text) from authenticated;
+grant execute on function robot_channels(text), robot_allowlist(text), robot_members(text),
+  robot_messages(text, text, timestamptz, int, int), robot_db_size_mb(text) to anon;
+
+-- ---------- 표 접근 권한 (GRANT) ----------
+-- 2026년 5월 30일 이후 만든 Supabase 프로젝트는 새 표를 앱(API)에 자동으로 열어 주지 않아요.
+-- 그래서 앱에 필요한 권한만 직접 줘요. 실제로 어떤 줄을 읽고 쓸지는 아래 RLS가 다시 막아요.
+-- 로그인 안 한 사용자(anon)에게는 표를 하나도 열지 않아요.
+revoke all on table allowlist, members, channels, channel_members, messages, thread_reads,
+  attachments, reactions, push_subscriptions, robot_key from anon, authenticated;
+grant select                         on table allowlist, members, channels, channel_members, thread_reads to authenticated;
+grant select, insert                 on table messages, attachments to authenticated;
+grant select, insert, delete         on table reactions to authenticated;
+grant select, insert, update, delete on table push_subscriptions to authenticated;
+-- 푸시 함수(Edge Function)는 관리자 키(service_role)로 읽고 써요
+grant all on table allowlist, members, channels, channel_members, messages, thread_reads,
+  attachments, reactions, push_subscriptions to service_role;
+revoke all on table robot_key from service_role;
 
 -- ---------- 행 단위 보안 규칙(RLS) ----------
+alter table robot_key          enable row level security;   -- 규칙 없음 = API로는 누구도 못 읽음
 alter table allowlist          enable row level security;
 alter table members            enable row level security;
 alter table channels           enable row level security;
