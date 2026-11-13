@@ -273,6 +273,25 @@ create or replace function channel_overview()
   order by c.sort, c.name;
 $$;
 
+-- 채널 추가 (관리자만). 이름은 '#' 없이 저장하고, 화면이 앞에 '#'을 붙여 보여 줘요.
+-- 고른 사람들의 명단(allowlist) channels에 이름을 더해서, 구성원은 명단 규칙대로 따라가요.
+create or replace function create_channel(p_name text, p_staff_only boolean, p_emails text[])
+  returns uuid language plpgsql security definer set search_path = public as $$
+declare nm text := btrim(regexp_replace(btrim(coalesce(p_name, '')), '^#+', '')); cid uuid;
+begin
+  if not is_active() or my_role() <> 'admin' then raise exception 'not_allowed'; end if;
+  if char_length(nm) < 1 or char_length(nm) > 20 then raise exception 'bad_name'; end if;
+  if nm ~ '[#,{}"\\]' then raise exception 'bad_name'; end if;
+  if exists (select 1 from channels where name = nm) then raise exception 'name_taken'; end if;
+  insert into channels (name, is_private, post_policy, sort)
+    values (nm, true, case when p_staff_only then 'staff' else 'all' end,
+            coalesce((select max(sort) from channels), 0) + 1)
+    returning id into cid;
+  update allowlist set channels = array_append(channels, nm)
+    where (email = any (array(select lower(e) from unnest(coalesce(p_emails, '{}')) e)) or email = my_email()) and not (nm = any (channels));
+  return cid;
+end $$;
+
 create or replace function my_threads()
   returns table (id uuid, channel_id uuid, sender_id uuid, body text, deleted_at timestamptz, reply_count int,
                  last_reply_at timestamptz, reply_users uuid[], unread int)

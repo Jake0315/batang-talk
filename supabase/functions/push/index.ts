@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
 
     const text = (m.body ?? "").trim() || (files?.length ? "📎 " + files.map((f) => f.name).join(", ") : "새 메시지");
     const sent = await deliver(ids, {
-      title: `${ch?.name ?? "Batang"}${m.parent_id ? " 스레드" : ""} · ${sender?.name ?? ""}`,
+      title: `${ch?.name ? "#" + ch.name : "Batang"}${m.parent_id ? " 스레드" : ""} · ${sender?.name ?? ""}`,
       body: text.length > 120 ? text.slice(0, 120) + "…" : text,
       url: `#/c/${m.channel_id}` + (m.parent_id ? `/t/${m.parent_id}` : ""),
       tag: m.parent_id ?? m.channel_id,

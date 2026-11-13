@@ -24,18 +24,18 @@ select t_ok((select count(*) = 3 from channel_members cm join members m on m.id 
 
 -- 2) 관리자가 국장방·공지·기획국에 글 작성
 select t_login('jake.example@gmail.com'); set role authenticated;
-select send_message((select id from channels where name='국장방'), '국장방 비밀 안건', null, false, '{}', false, '[]') as boss_msg \gset
+select send_message((select id from channels where name='국장'), '국장방 비밀 안건', null, false, '{}', false, '[]') as boss_msg \gset
 select send_message((select id from channels where name='공지'), '공지입니다', null, false, '{}', true, '[]') as notice_msg \gset
-select send_message((select id from channels where name='기획국'), '기획국 원글', null, false, '{}', false, '[{"drive_file_id":"F1","name":"a.pptx","mime":"x","size":"10"}]') as plan_msg \gset
+select send_message((select id from channels where name='기획'), '기획국 원글', null, false, '{}', false, '[{"drive_file_id":"F1","name":"a.pptx","mime":"x","size":"10"}]') as plan_msg \gset
 reset role;
 
 -- 3) 기획국원 시점
 select t_login('plan.member@gmail.com'); set role authenticated;
 select t_ok((select count(*) = 0 from messages where id = :'boss_msg'), '기획국원은 국장방 메시지를 못 읽음');
-select t_ok((select count(*) = 0 from channels where name = '국장방'), '기획국원은 국장방 채널 자체가 안 보임');
+select t_ok((select count(*) = 0 from channels where name = '국장'), '기획국원은 국장방 채널 자체가 안 보임');
 select t_ok((select count(*) = 3 from channel_overview()), '내 채널 목록은 3개');
 select t_ok((select count(*) = 1 from attachments), '기획국 첨부는 보임');
-select t_fails(format($$select send_message(%L, '몰래 쓰기', null, false, '{}', false, '[]')$$, (select id from public.channels where name = '국장방' limit 1)), '채널이 안 보이면 글도 못 씀(null 채널)');
+select t_fails(format($$select send_message(%L, '몰래 쓰기', null, false, '{}', false, '[]')$$, (select id from public.channels where name = '국장' limit 1)), '채널이 안 보이면 글도 못 씀(null 채널)');
 select t_fails($$insert into messages(channel_id, sender_id, body) values ('00000000-0000-0000-0000-000000000000', auth.uid(), 'x')$$, '없는 채널에 쓰기 차단');
 select t_fails(format($$select send_message(%L, '공지에 원글', null, false, '{}', false, '[]')$$, (select id from channels where name='공지')), '일반 회원은 공지에 원글 못 씀');
 select send_message((select id from channels where name='공지'), '공지에 스레드 답글', :'notice_msg', false, '{}', false, '[]') as reply1 \gset
@@ -44,16 +44,16 @@ select t_fails(format($$select send_message(%L, '채널에도', %L, true, '{}', 
 select t_fails(format($$select edit_message(%L, '남의 글 수정')$$, :'plan_msg'), '남의 메시지 수정 차단');
 select t_fails(format($$select delete_message(%L)$$, :'plan_msg'), '남의 메시지 삭제 차단');
 select t_fails(format($$update messages set body = 'hack' where id = %L; select 1/(select count(*) from messages where id = %L and body = 'hack')$$, :'plan_msg', :'plan_msg'), '직접 UPDATE는 반영 안 됨');
-select t_fails(format($$insert into messages(channel_id, sender_id, body) values (%L, %L, '사칭')$$, (select id from channels where name='기획국'), (select id from members where email='jake.example@gmail.com')), '남의 이름으로 쓰기 차단');
+select t_fails(format($$insert into messages(channel_id, sender_id, body) values (%L, %L, '사칭')$$, (select id from channels where name='기획'), (select id from members where email='jake.example@gmail.com')), '남의 이름으로 쓰기 차단');
 select t_fails($$insert into allowlist(email, name) values ('evil@gmail.com', 'x')$$, '일반 회원은 명단 수정 차단');
 select t_ok((select count(*) = 1 from allowlist), '명단은 내 줄만 보임');
 select t_fails(format($$insert into channel_members(channel_id, member_id) values (%L, auth.uid())$$, (select id from public.channels limit 1)), '채널 구성원 직접 추가 차단');
-select send_message((select id from channels where name='기획국'), '@채널 시도', null, false, '{}', true, '[]') as m2 \gset
+select send_message((select id from channels where name='기획'), '@채널 시도', null, false, '{}', true, '[]') as m2 \gset
 select t_ok((select not mention_all from messages where id = :'m2'), '일반 회원의 @채널은 무시됨');
 select edit_message(:'m2', '내 글 수정');
 select t_ok((select body = '내 글 수정' and edited_at is not null from messages where id = :'m2'), '내 메시지 수정 가능');
-select send_message((select id from channels where name='기획국'), '답글', :'plan_msg', false, '{}', false, '[]') as r2 \gset
-select t_fails(format($$select send_message(%L, '답글의 답글', %L, false, '{}', false, '[]')$$, (select id from channels where name='기획국'), :'r2'), '스레드는 한 단계만');
+select send_message((select id from channels where name='기획'), '답글', :'plan_msg', false, '{}', false, '[]') as r2 \gset
+select t_fails(format($$select send_message(%L, '답글의 답글', %L, false, '{}', false, '[]')$$, (select id from channels where name='기획'), :'r2'), '스레드는 한 단계만');
 reset role;
 select t_ok((select reply_count = 1 and last_reply_at is not null and array_length(reply_users,1) = 1 from messages where id = :'plan_msg'), '답글 수·참여자 집계');
 select t_ok((select count(*) = 2 from thread_reads where root_id = :'plan_msg' and following), '원글 작성자와 답글 작성자가 스레드 참여자');
@@ -63,15 +63,38 @@ select t_login('jake.example@gmail.com'); set role authenticated;
 select t_ok((select count(*) = 2 and sum(unread) = 2 from my_threads()), '내 스레드 2개, 안 읽은 답글 2개');
 select mark_thread_read(:'plan_msg');
 select t_ok((select sum(unread) = 1 from my_threads()), '스레드 읽음 처리');
-select t_ok((select unread = 1 from channel_overview() where name = '기획국'), '기획국 안 읽음 1개');
-select mark_read((select id from channels where name='기획국'));
-select t_ok((select unread = 0 from channel_overview() where name = '기획국'), '채널 읽음 처리');
+select t_ok((select unread = 1 from channel_overview() where name = '기획'), '기획국 안 읽음 1개');
+select mark_read((select id from channels where name='기획'));
+select t_ok((select unread = 0 from channel_overview() where name = '기획'), '채널 읽음 처리');
 select delete_message(:'m2');
 select t_ok((select body = '' and deleted_at is not null from messages where id = :'m2'), '관리자는 남의 메시지 삭제 가능');
 reset role;
 
+-- 4-1) 채널 추가: 관리자만, 이름은 '#' 없이 저장
+select t_login('plan.member@gmail.com'); set role authenticated;
+select t_fails($$select create_channel('몰래방', false, '{}')$$, '일반 회원은 채널 추가 못 함');
+select t_fails($$insert into channels(name) values ('몰래방2')$$, '일반 회원은 channels 표에 직접 못 넣음');
+reset role;
+select t_login('plan.head@gmail.com'); set role authenticated;
+select t_fails($$select create_channel('국장추가', false, '{}')$$, '운영진(staff)도 채널 추가 못 함');
+reset role;
+select t_login('jake.example@gmail.com'); set role authenticated;
+select create_channel('  #행사 ', false, array['PLAN.MEMBER@gmail.com']) as new_ch \gset
+select t_ok((select name = '행사' and post_policy = 'all' from channels where id = :'new_ch'), '관리자가 채널 추가, 앞의 # 빼고 저장');
+select t_ok((select count(*) = 1 from channel_overview() where name = '행사'), '추가한 관리자는 자동으로 구성원');
+select t_fails($$select create_channel('#행사', false, '{}')$$, '같은 이름 채널은 못 만듦');
+select t_fails($$select create_channel('###', false, '{}')$$, '빈 이름은 못 만듦');
+select t_fails($$select create_channel('행,사', false, '{}')$$, '쉼표 들어간 이름은 못 만듦');
+reset role;
+select t_login('plan.member@gmail.com'); set role authenticated;
+select t_ok((select count(*) = 1 from channel_overview() where name = '행사'), '고른 회원은 새 채널에 들어감');
+reset role;
+select t_login('plan.head@gmail.com'); set role authenticated;
+select t_ok((select count(*) = 0 from channels where name = '행사'), '고르지 않은 사람은 새 채널이 안 보임');
+reset role;
+
 -- 5) 명단 변경 → 즉시 반영
-update allowlist set channels = '{공지,자유}' where email = 'plan.member@gmail.com';
+update allowlist set channels = '{공지,친목}' where email = 'plan.member@gmail.com';
 select t_login('plan.member@gmail.com'); set role authenticated;
 select t_ok((select count(*) = 0 from messages where id = :'plan_msg'), '채널에서 빠지면 그 채널 메시지 못 읽음');
 reset role;

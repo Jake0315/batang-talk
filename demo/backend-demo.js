@@ -13,11 +13,11 @@ var me = { id: 'u0', name: '김정훈', email: 'jake@example.com', role: 'admin'
 members[0].email = me.email;
 var all = names.slice(), heads = ['김정훈', '김유나', '김서연', '박지호', '이하린', '최민준'];
 var defs = [
-  ['공지', false, 'staff', all], ['자유', false, 'all', all], ['국장방', true, 'all', heads],
-  ['기획국', true, 'all', ['김정훈', '김유나', '김서연', '정유나', '한도윤', '윤채원']],
-  ['대외협력국', true, 'all', ['김정훈', '김유나', '박지호', '오세훈', '강지민']],
-  ['홍보국', true, 'all', ['김정훈', '김유나', '이하린', '임수아', '송현우', '배다은']],
-  ['사무국', true, 'all', ['김정훈', '김유나', '최민준', '조예린', '신우진']]
+  ['공지', false, 'staff', all], ['친목', false, 'all', all], ['국장', true, 'all', heads],
+  ['기획', true, 'all', ['김정훈', '김유나', '김서연', '정유나', '한도윤', '윤채원']],
+  ['대협', true, 'all', ['김정훈', '김유나', '박지호', '오세훈', '강지민']],
+  ['홍보', true, 'all', ['김정훈', '김유나', '이하린', '임수아', '송현우', '배다은']],
+  ['사무', true, 'all', ['김정훈', '김유나', '최민준', '조예린', '신우진']]
 ];
 var channels = [], cms = [], msgs = [], treads = [], C = {};
 defs.forEach(function (d, i) {
@@ -53,35 +53,35 @@ add('공지', '김유나', 1480, '알림 안 오시는 분은 내 정보 탭에�
 var n2 = add('공지', '김유나', 190, '이번 주 전체 회의는 목요일 저녁 6시, 북악관 615호예요. 못 오시는 분은 스레드에 남겨 주세요.', { rx: [['김서연', '✅'], ['최민준', '✅'], ['이하린', '✅']] });
 add('공지', '오세훈', 170, '수업이 6시 15분에 끝나서 조금 늦어요!', { parent: n2 });
 
-add('자유', '송현우', 400, '학회실 리모델링 끝나면 집들이 하나요 ㅎㅎ');
-add('자유', '윤채원', 395, '타앙이 인형 놓아야죠', { rx: [['송현우', '😂'], ['배다은', '😂']] });
-add('자유', '강지민', 60, '오늘 학식 제육이래요');
+add('친목', '송현우', 400, '학회실 리모델링 끝나면 집들이 하나요 ㅎㅎ');
+add('친목', '윤채원', 395, '타앙이 인형 놓아야죠', { rx: [['송현우', '😂'], ['배다은', '😂']] });
+add('친목', '강지민', 60, '오늘 학식 제육이래요');
 
-add('국장방', '김서연', 240, '목요일 회의 안건 모을게요. OT 예산, 굿즈 발주 말고 더 있을까요?');
-add('국장방', '박지호', 232, '제휴 카페 협약서 초안 공유드려도 될까요?');
-var b1 = add('국장방', '김정훈', 228, '좋아요. 안건은 OT 예산, 굿즈 발주, 제휴 협약 세 가지로 할게요.', { rx: [['김서연', '👍'], ['박지호', '👍']] });
-add('국장방', '최민준', 180, '@김정훈 예산 시트 링크도 같이 올려 주실 수 있나요?', { parent: b1, mention: ['김정훈'] });
-add('국장방', '이하린', 25, '굿즈 시안은 수요일까지 홍보국에서 올릴게요.');
+add('국장', '김서연', 240, '목요일 회의 안건 모을게요. OT 예산, 굿즈 발주 말고 더 있을까요?');
+add('국장', '박지호', 232, '제휴 카페 협약서 초안 공유드려도 될까요?');
+var b1 = add('국장', '김정훈', 228, '좋아요. 안건은 OT 예산, 굿즈 발주, 제휴 협약 세 가지로 할게요.', { rx: [['김서연', '👍'], ['박지호', '👍']] });
+add('국장', '최민준', 180, '@김정훈 예산 시트 링크도 같이 올려 주실 수 있나요?', { parent: b1, mention: ['김정훈'] });
+add('국장', '이하린', 25, '굿즈 시안은 수요일까지 홍보국에서 올릴게요.');
 
-var p1 = add('기획국', '정유나', 300, 'OT 기획안 1차 올립니다. 피드백 부탁드려요!', { files: [['2027 신입생 OT 기획안_v1.pptx', PPT, 5347737]], rx: [['김서연', '👀'], ['한도윤', '👍']] });
-add('기획국', '한도윤', 280, '2부 레크레이션 시간이 조금 긴 것 같아요.', { parent: p1, edited: true });
-add('기획국', '김서연', 260, '레크 30분 줄이고 학과 소개를 넣는 건 어때요?', { parent: p1 });
-add('기획국', '윤채원', 250, '찬성이에요. 교수님 인사 시간도 10분 필요해요.', { parent: p1 });
-add('기획국', '정유나', 40, '반영해서 v2 올렸어요. 레크 30분 줄였습니다.', { parent: p1, also: true, files: [['2027 신입생 OT 기획안_v2.pptx', PPT, 5512000]] });
-add('기획국', '김서연', 35, '장소는 북악관 1005호로 예약 넣어 둘게요.');
-add('기획국', '김서연', 34, '예약 확정되면 바로 공유할게요.');
-add('기획국', '윤채원', 12, '@김정훈 OT 날짜 2월 26일로 확정해도 될까요?', { mention: ['김정훈'] });
+var p1 = add('기획', '정유나', 300, 'OT 기획안 1차 올립니다. 피드백 부탁드려요!', { files: [['2027 신입생 OT 기획안_v1.pptx', PPT, 5347737]], rx: [['김서연', '👀'], ['한도윤', '👍']] });
+add('기획', '한도윤', 280, '2부 레크레이션 시간이 조금 긴 것 같아요.', { parent: p1, edited: true });
+add('기획', '김서연', 260, '레크 30분 줄이고 학과 소개를 넣는 건 어때요?', { parent: p1 });
+add('기획', '윤채원', 250, '찬성이에요. 교수님 인사 시간도 10분 필요해요.', { parent: p1 });
+add('기획', '정유나', 40, '반영해서 v2 올렸어요. 레크 30분 줄였습니다.', { parent: p1, also: true, files: [['2027 신입생 OT 기획안_v2.pptx', PPT, 5512000]] });
+add('기획', '김서연', 35, '장소는 북악관 1005호로 예약 넣어 둘게요.');
+add('기획', '김서연', 34, '예약 확정되면 바로 공유할게요.');
+add('기획', '윤채원', 12, '@김정훈 OT 날짜 2월 26일로 확정해도 될까요?', { mention: ['김정훈'] });
 
-var e1 = add('대외협력국', '오세훈', 1440, '정문 앞 카페에서 답변 왔어요. 학생증 보여 주면 10% 할인 확정!', { rx: [['박지호', '🎉'], ['강지민', '🎉'], ['김정훈', '👍']] });
-add('대외협력국', '강지민', 1400, '협약서 초안이에요.', { files: [['제휴 협약서_초안.docx', DOC, 287000]] });
-add('대외협력국', '박지호', 1390, '바탕화면 KMU 혜택 메뉴에도 올려야겠네요.', { parent: e1 });
+var e1 = add('대협', '오세훈', 1440, '정문 앞 카페에서 답변 왔어요. 학생증 보여 주면 10% 할인 확정!', { rx: [['박지호', '🎉'], ['강지민', '🎉'], ['김정훈', '👍']] });
+add('대협', '강지민', 1400, '협약서 초안이에요.', { files: [['제휴 협약서_초안.docx', DOC, 287000]] });
+add('대협', '박지호', 1390, '바탕화면 KMU 혜택 메뉴에도 올려야겠네요.', { parent: e1 });
 
-add('홍보국', '임수아', 320, 'OT 포스터 시안이에요.', { files: [['OT_포스터_시안1.png', 'image/png', 2411724]], rx: [['송현우', '👍'], ['이하린', '👍'], ['배다은', '🎉']] });
-add('홍보국', '송현우', 310, '색감 너무 좋아요. 민트가 로고랑 잘 맞네요.');
-add('홍보국', '이하린', 90, '@배다은 카드뉴스 문구 내일까지 가능할까요?', { mention: ['배다은'] });
+add('홍보', '임수아', 320, 'OT 포스터 시안이에요.', { files: [['OT_포스터_시안1.png', 'image/png', 2411724]], rx: [['송현우', '👍'], ['이하린', '👍'], ['배다은', '🎉']] });
+add('홍보', '송현우', 310, '색감 너무 좋아요. 민트가 로고랑 잘 맞네요.');
+add('홍보', '이하린', 90, '@배다은 카드뉴스 문구 내일까지 가능할까요?', { mention: ['배다은'] });
 
-add('사무국', '조예린', 1300, '지난 회의록 드라이브에 올렸어요.', { files: [['11월 2주차 회의록.docx', DOC, 54000]] });
-add('사무국', '신우진', 1290, '확인했습니다!', { rx: [['조예린', '🙏']] });
+add('사무', '조예린', 1300, '지난 회의록 드라이브에 올렸어요.', { files: [['11월 2주차 회의록.docx', DOC, 54000]] });
+add('사무', '신우진', 1290, '확인했습니다!', { rx: [['조예린', '🙏']] });
 msgs.forEach(function (m) { if (m.sender_id === me.id) cms.forEach(function (c) { if (c.channel_id === m.channel_id && c.member_id === me.id && Date.parse(c.last_read_at) < Date.parse(m.created_at)) c.last_read_at = m.created_at; }); });
 
 var H = {}, logged = false, quiet = true, urls = {};
@@ -112,7 +112,7 @@ function incoming(ch, who, body, o, delay) {
     if (m.parent_id) byId(m.parent_id).last_reply_at = m.created_at;
     emit(m); if (m.parent_id) emit(byId(m.parent_id));
     var open = location.hash.indexOf('/c/' + m.channel_id) >= 0;
-    if (!open || document.hidden) pushBanner(ch + (m.parent_id ? ' 스레드' : '') + ' · ' + who, body, '#/c/' + m.channel_id + (m.parent_id ? '/t/' + m.parent_id : ''));
+    if (!open || document.hidden) pushBanner('#' + ch + (m.parent_id ? ' 스레드' : '') + ' · ' + who, body, '#/c/' + m.channel_id + (m.parent_id ? '/t/' + m.parent_id : ''));
   }, delay);
 }
 
@@ -122,11 +122,22 @@ window.BACKEND = {
   init: function () { return wait(logged ? { status: 'ok', me: me } : { status: 'signedout' }, 200); },
   signIn: function () {
     logged = true; window.BATANG_BOOT();
-    incoming('홍보국', '배다은', '@김정훈 카드뉴스 초안 올렸어요! 확인 부탁드려요', { mention: ['김정훈'] }, 6000);
-    incoming('기획국', '한도윤', '저는 26일 좋아요!', {}, 16000);
+    incoming('홍보', '배다은', '@김정훈 카드뉴스 초안 올렸어요! 확인 부탁드려요', { mention: ['김정훈'] }, 6000);
+    incoming('기획', '한도윤', '저는 26일 좋아요!', {}, 16000);
   },
   signOut: function () { location.hash = ''; location.reload(); },
   listMembers: function () { return wait(members); },
+  listAllowlist: function () {
+    return wait(members.map(function (m) { return { email: m.email, name: m.name, role: m.id === me.id ? 'admin' : heads.indexOf(m.name) >= 0 ? 'staff' : 'member' }; }));
+  },
+  createChannel: function (name, staffOnly, emails) {
+    name = String(name || '').trim().replace(/^#+/, '').trim();
+    if (!name || name.length > 20 || /[#,{}"\\]/.test(name)) return Promise.reject(new Error('bad_name'));
+    if (channels.some(function (c) { return c.name === name; })) return Promise.reject(new Error('name_taken'));
+    var c = { id: id('c'), name: name, is_private: true, post_policy: staffOnly ? 'staff' : 'all', sort: channels.length }; channels.push(c); C[name] = c.id;
+    members.forEach(function (m) { if (m.id === me.id || (emails || []).indexOf(m.email) >= 0) cms.push({ channel_id: c.id, member_id: m.id, last_read_at: new Date().toISOString(), notify: 'all' }); });
+    return wait(c.id, 300);
+  },
   overview: function () {
     return wait(channels.filter(function (c) { return myCm(c.id); }).map(function (c) {
       var cm = myCm(c.id), t = Date.parse(cm.last_read_at);

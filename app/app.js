@@ -58,6 +58,7 @@ function av(id, cls) {
   return '<span class="av ' + (cls || '') + '" style="background:' + AVC[h % AVC.length] + '">' + inner + '</span>';
 }
 function name(id) { return (S.members[id] || {}).name || '알 수 없음'; }
+function cn(c) { return c ? '#' + c.name : ''; }
 function chan(id) { for (var i = 0; i < S.channels.length; i++) if (S.channels[i].id === id) return S.channels[i]; return null; }
 function isStaff() { return S.me.role === 'admin' || S.me.role === 'staff'; }
 function reRx(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -139,17 +140,18 @@ function renderTab() {
   if (S.tab === 'home') {
     h = '<div class="top"><div class="brand">Batang</div><button class="ib" data-act="search" aria-label="검색">' + I.search + '</button></div>' + homeBanner() +
       '<div class="h2">채널</div><div class="list">' + S.channels.map(function (c) {
-        return '<button class="row' + (c.unread ? ' unread' : '') + '" data-act="open" data-c="' + c.id + '"><span class="ic">' + (c.is_private ? I.lock : I.hash) + '</span>' +
+        return '<button class="row' + (c.unread ? ' unread' : '') + '" data-act="open" data-c="' + c.id + '"><span class="ic">' + I.hash + '</span>' +
           '<span class="nm">' + esc(c.name) + '</span>' + (c.notify === 'mentions' ? '<span class="mute">' + I.bellOff + '</span>' : '') +
           (c.mentions ? '<span class="badge hot">@' + c.mentions + '</span>' : c.unread ? '<span class="badge">' + c.unread + '</span>' : '') + '</button>';
-      }).join('') + '</div>' + (S.channels.length ? '' : '<div class="empty">아직 들어간 채널이 없어요.<br>관리자에게 알려 주세요.</div>');
+      }).join('') + (S.me.role === 'admin' ? '<button class="row add" data-act="newChannel"><span class="ic">' + I.plus + '</span><span class="nm">채널 추가</span></button>' : '') + '</div>' +
+      (S.channels.length ? '' : '<div class="empty">아직 들어간 채널이 없어요.<br>관리자에게 알려 주세요.</div>');
   } else if (S.tab === 'threads') {
     h = '<div class="top"><div class="brand">스레드</div></div>';
     if (!S.threads) h += skel(4);
     else if (!S.threads.length) h += '<div class="empty"><img src="' + B.img('taang_thinking') + '" alt="">참여 중인 스레드가 없어요.<br>메시지를 눌러 답글을 달아 보세요.</div>';
     else h += '<div class="list">' + S.threads.map(function (t) {
       var c = chan(t.channel_id);
-      return '<button class="item" data-act="hit" data-c="' + t.channel_id + '" data-t="' + t.id + '"><div class="meta"><b>' + esc(c ? c.name : '') + '</b>· ' + esc(name(t.sender_id)) + (t.unread ? '<span class="pip"></span>' : '') + '</div>' +
+      return '<button class="item" data-act="hit" data-c="' + t.channel_id + '" data-t="' + t.id + '"><div class="meta"><b>' + esc(cn(c)) + '</b>· ' + esc(name(t.sender_id)) + (t.unread ? '<span class="pip"></span>' : '') + '</div>' +
         '<div class="tx">' + (t.deleted_at ? '삭제된 메시지예요' : esc(t.body || '📎 파일')) + '</div><div class="ft">답글 ' + t.reply_count + '개 · ' + rel(t.last_reply_at) + (t.unread ? ' · <b style="color:var(--bad)">새 답글 ' + t.unread + '</b>' : '') + '</div></button>';
     }).join('') + '</div>';
   } else if (S.tab === 'activity') {
@@ -158,7 +160,7 @@ function renderTab() {
     else if (!S.mentions.length) h += '<div class="empty"><img src="' + B.img('taang_hello') + '" alt="">나를 멘션한 메시지가 여기 모여요.</div>';
     else h += '<div class="list">' + S.mentions.map(function (m) {
       var c = chan(m.channel_id);
-      return '<button class="item" data-act="hit" data-c="' + m.channel_id + '" data-t="' + (m.parent_id || '') + '" data-id="' + m.id + '"><div class="meta"><b>' + esc(name(m.sender_id)) + '</b>· ' + esc(c ? c.name : '') + ' · ' + rel(m.created_at) + '</div><div class="tx">' + rich(m.body) + '</div></button>';
+      return '<button class="item" data-act="hit" data-c="' + m.channel_id + '" data-t="' + (m.parent_id || '') + '" data-id="' + m.id + '"><div class="meta"><b>' + esc(name(m.sender_id)) + '</b>· ' + esc(cn(c)) + ' · ' + rel(m.created_at) + '</div><div class="tx">' + rich(m.body) + '</div></button>';
     }).join('') + '</div>';
   } else {
     var p = S.push || {}, role = { admin: '관리자', staff: '운영진', member: '회원' }[S.me.role];
@@ -343,7 +345,7 @@ function send(kind) {
 function openChannel(id, focus) {
   var c = chan(id);
   S.ch = { id: id, msgs: [], cm: [], loading: true, more: false, pending: [], edit: null, newFrom: c ? ts(c.last_read_at) : 0, focus: focus, hl: null };
-  $('#scr-channel').innerHTML = '<div class="top line"><button class="ib" data-act="back" aria-label="뒤로">' + I.back + '</button><div class="ttl"><b>' + (c ? esc(c.name) : '') + '</b><small>' + (c ? '구성원 ' + c.member_count + '명' : '') + '</small></div>' +
+  $('#scr-channel').innerHTML = '<div class="top line"><button class="ib" data-act="back" aria-label="뒤로">' + I.back + '</button><div class="ttl"><b>' + esc(cn(c)) + '</b><small>' + (c ? '구성원 ' + c.member_count + '명' : '') + '</small></div>' +
     '<button class="ib" data-act="search" data-c="' + id + '" aria-label="검색">' + I.search + '</button><button class="ib" data-act="notif" aria-label="알림 설정">' + (c && c.notify === 'mentions' ? I.bellOff : I.bell) + '</button></div>' +
     '<div class="msgs" id="list-ch">' + skel(6) + '</div>' + (c ? compHTML('ch') : '');
   if (!c) { S.ch.loading = false; $('#list-ch').innerHTML = '<div class="empty"><img src="' + B.img('taang_sorry') + '" alt="">볼 수 없는 채널이에요.</div>'; return; }
@@ -421,7 +423,7 @@ function renderThreadTop() {
   var el = $('#th-top'); if (!el || !S.th) return;
   var c = S.th.root && chan(S.th.root.channel_id);
   var mine = S.th.reads.filter(function (r) { return r.member_id === S.me.id; })[0], fol = !!(mine && mine.following);
-  el.innerHTML = '<button class="ib" data-act="back" aria-label="뒤로">' + I.back + '</button><div class="ttl"><b>스레드</b><small>' + (c ? esc(c.name) : '') + '</small></div>' +
+  el.innerHTML = '<button class="ib" data-act="back" aria-label="뒤로">' + I.back + '</button><div class="ttl"><b>스레드</b><small>' + esc(cn(c)) + '</small></div>' +
     (S.th.root ? '<button class="ib' + (fol ? ' on' : '') + '" data-act="follow" aria-label="스레드 알림">' + (fol ? I.bell : I.bellOff) + '</button>' : '');
 }
 
@@ -457,8 +459,21 @@ function readersSheet(id, kind) {
 }
 function notifSheet() {
   var c = chan(S.ch.id); if (!c) return;
-  openSheet('<h3>' + esc(c.name) + ' 알림</h3><div class="opt"><div class="g"><b>모든 메시지 알림</b><small>끄면 나를 멘션했을 때만 알려요</small></div><button class="toggle' + (c.notify === 'all' ? ' on' : '') + '" data-act="setNotify" aria-label="모든 메시지 알림"></button></div>' +
+  openSheet('<h3>' + esc(cn(c)) + ' 알림</h3><div class="opt"><div class="g"><b>모든 메시지 알림</b><small>끄면 나를 멘션했을 때만 알려요</small></div><button class="toggle' + (c.notify === 'all' ? ' on' : '') + '" data-act="setNotify" aria-label="모든 메시지 알림"></button></div>' +
     '<div class="opt"><div class="g"><b>멘션은 항상 알림</b><small>@' + esc(S.me.name) + ' · @채널</small></div><button class="toggle on" disabled style="opacity:.5" aria-label="항상 켜짐"></button></div>');
+}
+function newChannelSheet() {
+  openSheet('<h3>채널 추가</h3><div class="sbox"><b style="color:var(--faint)">#</b><input id="nc-name" maxlength="20" placeholder="채널 이름" autocomplete="off" aria-label="채널 이름"></div>' +
+    '<div class="opt"><div class="g"><b>운영진만 글쓰기</b><small>다른 회원은 스레드 답글만 달 수 있어요</small></div><button class="toggle" data-act="ncStaff" aria-label="운영진만 글쓰기"></button></div>' +
+    '<div class="h2" style="margin-left:2px">들어갈 사람 <small style="font-weight:400">· 나는 자동으로 들어가요</small></div><div class="mlist nc" id="nc-list"><div class="empty" style="padding:14px">불러오는 중이에요</div></div>' +
+    '<button class="btn primary" data-act="ncSave">만들기</button>', 'tall');
+  B.listAllowlist().then(function (rows) {
+    var el = $('#nc-list'); if (!el) return;
+    el.innerHTML = rows.filter(function (r) { return r.email !== S.me.email; }).map(function (r) {
+      return '<button data-act="ncPick" data-email="' + esc(r.email) + '"><span class="ck">' + I.check + '</span>' + esc(r.name) + ' <small style="color:var(--sub)">' + esc({ admin: '관리자', staff: '운영진', member: '회원' }[r.role] || '') + '</small></button>';
+    }).join('') || '<div class="empty" style="padding:14px">명단에 다른 사람이 없어요</div>';
+  }).catch(fail);
+  setTimeout(function () { var i = $('#nc-name'); if (i) i.focus(); }, 300);
 }
 function previewSheet(mid, aid) {
   var a = findAtt(mid, aid); if (!a) return;
@@ -489,7 +504,7 @@ function doSearch(q) {
       var el = $('#sres'); if (!el) return;
       el.innerHTML = rows.length ? rows.map(function (m) {
         var c = chan(m.channel_id);
-        return '<button class="item" data-act="hit" data-c="' + m.channel_id + '" data-t="' + (m.parent_id || '') + '" data-id="' + m.id + '" data-q="' + esc(q) + '"><div class="meta"><b>' + esc(name(m.sender_id)) + '</b>· ' + esc(c ? c.name : '') + ' · ' + rel(m.created_at) + '</div><div class="tx">' + rich(m.body, q) + '</div></button>';
+        return '<button class="item" data-act="hit" data-c="' + m.channel_id + '" data-t="' + (m.parent_id || '') + '" data-id="' + m.id + '" data-q="' + esc(q) + '"><div class="meta"><b>' + esc(name(m.sender_id)) + '</b>· ' + esc(cn(c)) + ' · ' + rel(m.created_at) + '</div><div class="tx">' + rich(m.body, q) + '</div></button>';
       }).join('') : '<div class="empty"><img src="' + B.img('taang_thinking') + '" alt="">찾는 메시지가 없어요.</div>';
     }).catch(fail);
   }, 300);
@@ -540,6 +555,26 @@ var ACT = {
   },
   send: function (el) { send(el.dataset.kind); },
   notif: notifSheet,
+  newChannel: newChannelSheet,
+  ncStaff: function (el) { el.classList.toggle('on'); },
+  ncPick: function (el) { el.classList.toggle('on'); },
+  ncSave: function (el) {
+    var nm = ($('#nc-name').value || '').trim().replace(/^#+/, '').trim();
+    if (!nm) { toast('채널 이름을 적어 주세요'); return; }
+    if (/[#,{}"\\]/.test(nm)) { toast('이름에 # , { } " 는 쓸 수 없어요'); return; }
+    var emails = Array.prototype.map.call(document.querySelectorAll('#nc-list .on'), function (b) { return b.dataset.email; });
+    var staff = $('[data-act="ncStaff"]').classList.contains('on');
+    el.disabled = true;
+    B.createChannel(nm, staff, emails).then(function (id) {
+      closeSheet(); toast('#' + nm + ' 채널을 만들었어요');
+      return B.overview().then(function (d) { S.channels = d; go('#/c/' + id); });
+    }).catch(function (e) {
+      el.disabled = false;
+      var msg = String((e && (e.message || e.code)) || '');
+      e.userMessage = /name_taken|duplicate/.test(msg) ? '같은 이름의 채널이 이미 있어요' : /bad_name/.test(msg) ? '채널 이름을 1~20자로 적어 주세요' : /not_allowed/.test(msg) ? '관리자만 채널을 만들 수 있어요' : '채널을 만들지 못했어요';
+      fail(e);
+    });
+  },
   setNotify: function (el) {
     var c = chan(S.ch.id), mode = c.notify === 'all' ? 'mentions' : 'all'; c.notify = mode; el.classList.toggle('on', mode === 'all');
     $('#scr-channel [data-act="notif"]').innerHTML = mode === 'all' ? I.bell : I.bellOff;

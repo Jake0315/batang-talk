@@ -25,7 +25,7 @@ P() { psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 "$@"; }
 P -c "drop database if exists batang_test" -c "create database batang_test"
 T=$(printf '%s' "$DATABASE_URL" | sed -E 's#/postgres(\?|$)#/batang_test\1#')
 Q() { psql "$T" -X -q -v ON_ERROR_STOP=1 "$@"; }
-Q -f "$ROOT/supabase/tests/local_stub.sql" >/dev/null
+Q -f "$ROOT/supabase/tests/local_stub.sql" >/dev/null 2>&1
 echo "· schema.sql 1회차 (한 트랜잭션)"; Q --single-transaction -f "$ROOT/supabase/schema.sql" >/dev/null
 echo "· schema.sql 2회차 (다시 실행해도 되는지)"; Q --single-transaction -f "$ROOT/supabase/schema.sql" >/dev/null
 Q -f "$ROOT/supabase/seed.sql" -f "$ROOT/supabase/tests/fixtures.sql" >/dev/null
@@ -33,5 +33,12 @@ echo "· 보안 규칙 점검"
 OUT=$(PGOPTIONS="-c client_min_messages=notice" Q -f "$ROOT/supabase/tests/rls_test.sql" 2>&1) || { echo "$OUT" | grep -E "FAIL|ERROR" ; exit 1; }
 echo "$OUT" | grep -c "pass:" | xargs -I{} echo "  통과 {}개"
 echo "$OUT" | grep -q "ALL PASS" || { echo "끝까지 가지 못했어요"; exit 1; }
+P -c "drop database batang_test"
+echo "· 예전 채널 이름에서 seed.sql 다시 실행"
+P -c "create database batang_test"
+Q -f "$ROOT/supabase/tests/local_stub.sql" >/dev/null 2>&1
+Q --single-transaction -f "$ROOT/supabase/schema.sql" >/dev/null
+Q -f "$ROOT/supabase/tests/seed_rename_test.sql" -f "$ROOT/supabase/seed.sql" -f "$ROOT/supabase/seed.sql" >/dev/null
+PGOPTIONS="-c client_min_messages=notice" Q -v check=1 -f "$ROOT/supabase/tests/seed_rename_test.sql" 2>&1 | grep -E "pass:|FAIL" || { echo "이름 바꾸기 점검 실패"; exit 1; }
 P -c "drop database batang_test"
 echo "DB 점검 통과"

@@ -57,6 +57,8 @@ var B = window.BACKEND = {
   signOut: function () { return sb.auth.signOut().then(function () { location.hash = ''; location.reload(); }); },
 
   listMembers: function () { return sb.from('members').select('id,name,email,avatar_url').then(ok); },
+  listAllowlist: function () { return sb.from('allowlist').select('email,name,role').order('name').then(ok); },   // 관리자만 전부 보여요
+  createChannel: function (name, staffOnly, emails) { return sb.rpc('create_channel', { p_name: name, p_staff_only: !!staffOnly, p_emails: emails || [] }).then(ok); },
   overview: function () { return sb.rpc('channel_overview').then(ok); },
   channelMembers: function (cid) { return sb.from('channel_members').select('channel_id,member_id,last_read_at,notify').eq('channel_id', cid).then(ok); },
   listMessages: function (cid, before) {
