@@ -1,0 +1,41 @@
+name: deploy-apps-script
+
+# main의 apps-script/ 가 바뀌면 Apps Script에 올리고, 같은 웹앱 주소(/exec)를 새 버전으로 갱신해요.
+# 바탕화면 저장소와 같은 방식이라, 같은 구글 계정이면 CLASPRC_JSON을 그대로 써도 돼요.
+on:
+  push:
+    branches: [main]
+    paths: ['apps-script/**', '.github/workflows/deploy-apps-script.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-apps-script
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: clasp 설치
+        run: npm install -g @google/clasp
+      - name: 구글 인증·대상 스크립트 준비
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$SCRIPT_ID" ]; then echo "CLASPRC_JSON 또는 APPS_SCRIPT_ID 비밀 값이 없어요"; exit 1; fi
+          printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          printf '{"scriptId":"%s","rootDir":"apps-script"}' "$SCRIPT_ID" > .clasp.json
+      - name: 코드 올리기
+        run: clasp push --force
+      - name: 같은 웹앱 주소를 새 버전으로 갱신
+        env:
+          DEPLOYMENT_ID: ${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}
+        run: |
+          if [ -z "$DEPLOYMENT_ID" ]; then echo "APPS_SCRIPT_DEPLOYMENT_ID 비밀 값이 없어요"; exit 1; fi
+          clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "auto ${GITHUB_SHA:0:7}"

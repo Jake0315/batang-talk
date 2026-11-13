@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Batang</title>
+<meta name="theme-color" content="#F5FBFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101A1B" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Batang">
+<meta name="format-detection" content="telephone=no">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="icon" href="img/icon-192.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <section class="screen" id="scr-auth"></section>
+  <section class="screen" id="scr-main" hidden><div class="tabview" id="tabview"></div><nav class="tabbar" id="tabbar"></nav></section>
+  <section class="screen push" id="scr-channel"></section>
+  <section class="screen push" id="scr-thread"></section>
+  <div id="sheet-root"></div>
+  <div class="toast" id="toast"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="backend-supabase.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

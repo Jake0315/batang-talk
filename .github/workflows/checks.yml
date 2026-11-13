@@ -1,0 +1,52 @@
+name: checks
+
+# 모든 브랜치에 올라올 때마다 점검해요. main은 이 점검을 통과한 커밋만 받아요(저장소 규칙).
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: DB 설계·보안 규칙 점검
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: bash tools/test-db.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 화면·Apps Script 문법 점검
+        run: |
+          for f in app/*.js demo/*.js; do node --check "$f"; done
+          cp apps-script/Code.gs /tmp/Code.js && node --check /tmp/Code.js
+          python3 -c "import json;json.load(open('app/manifest.webmanifest'));json.load(open('apps-script/appsscript.json'))"
+
+      - name: 시연용 demo.html이 최신인지
+        run: |
+          python3 tools/build-demo.py
+          git diff --exit-code demo.html || { echo "app/을 고쳤으면 python3 tools/build-demo.py 를 실행해 demo.html도 같이 올려 주세요"; exit 1; }
+
+      - name: 공개되면 안 되는 값이 없는지
+        run: python3 tools/check-secrets.py
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: 푸시 알림 함수 타입 점검
+        run: deno check supabase/functions/push/index.ts

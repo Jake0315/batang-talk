@@ -1,0 +1,53 @@
+name: deploy-pages
+
+# main의 app/ 이 바뀌면 화면을 GitHub Pages에 올려요.
+# config.js는 저장소 설정의 Variables(SUPABASE_URL 등)로 만들어서, 파일을 직접 고치지 않아도 돼요.
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/deploy-pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 배포용 폴더 만들기
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.SUPABASE_KEY }}
+          GAS_URL: ${{ vars.GAS_URL }}
+          VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
+        run: |
+          cp -r app _site
+          export VER="$(date -u +%Y%m%d)-${GITHUB_SHA:0:7}"
+          if [ -n "$SUPABASE_URL" ]; then
+            python3 tools/write-config.py _site/config.js
+          else
+            echo "Variables가 비어 있어서 저장소의 app/config.js를 그대로 써요"
+          fi
+          # 휴대폰이 새 화면을 받도록 서비스 워커 보관함 이름을 배포마다 바꿈
+          sed -i "s/var CACHE = 'batang-v1';/var CACHE = 'batang-$VER';/" _site/sw.js
+          grep -q "batang-$VER" _site/sw.js
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

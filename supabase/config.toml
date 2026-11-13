@@ -1,0 +1,5 @@
+# Supabase CLI 설정 (함수 자동 배포용)
+project_id = "batang"
+
+[functions.push]
+verify_jwt = false   # DB 웹훅이 부르므로 로그인 확인은 끄고, 함수 안에서 웹훅 비밀번호로 확인

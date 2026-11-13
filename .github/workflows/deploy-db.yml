@@ -1,0 +1,29 @@
+name: deploy-db
+
+# main의 supabase/schema.sql 이 바뀌면 운영 Supabase에 적용해요.
+# 한 트랜잭션으로 실행해서, 중간에 실패하면 아무것도 바뀌지 않아요.
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/schema.sql']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-db
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: 운영 DB에 schema.sql 적용
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGOPTIONS: -c client_min_messages=warning
+        run: |
+          if [ -z "$DB_URL" ]; then echo "SUPABASE_DB_URL 비밀 값이 없어요"; exit 1; fi
+          sudo apt-get -qq update >/dev/null && sudo apt-get -qq install -y postgresql-client >/dev/null
+          psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 --single-transaction -f supabase/schema.sql
+          echo "적용 완료"
