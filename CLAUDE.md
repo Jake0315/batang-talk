@@ -39,9 +39,14 @@ BACKEND에 함수를 더하면 **두 파일 모두** 같은 이름으로 만들�
 
 - **보안 규칙(RLS)을 약하게 만들지 않아요.** 회원은 자기 채널만 읽고, 자기 이름으로만 쓰고, 자기 글만 고쳐요. 명단(allowlist)에 없으면 아무것도 못 해요.
   `schema.sql`을 고치면 `supabase/tests/rls_test.sql`에 그 변경을 확인하는 점검을 더해요. 기존 점검을 지우거나 느슨하게 바꾸지 않아요.
+- **새 표를 만들면 권한(GRANT)도 직접 줘요.** 2026-05-30 이후 Supabase 새 프로젝트는 새 표를 API에 자동으로 열지 않아요.
+  `schema.sql`의 '표 접근 권한' 부분에 필요한 만큼만 더하고(anon에는 주지 않음), 점검(`local_stub.sql`)도 자동 권한 없이 돌아요.
+- Apps Script는 Supabase 관리자 키를 쓰지 않아요(새 `sb_secret_` 키는 Apps Script에서 막힘). DB가 더 필요하면
+  로봇 비밀번호를 확인하는 `robot_…` 함수를 더하고, 읽기 전용·필요한 열만 주게 만들어요.
+- 채널 이름은 `#` 없이 저장하고, 화면에서 `cn(c)`로 `#이름`을 보여 줘요.
 - `schema.sql`은 **여러 번 실행해도 되고, 한 트랜잭션 안에서 실행돼도** 되게 유지해요 (`if not exists`, `create or replace`, 정책은 지우고 다시 만듦).
   표를 지우거나 열을 없애는 변경은 데이터가 사라지니, 하기 전에 Jake에게 먼저 물어봐요.
-- **비밀 값을 저장소에 넣지 않아요**: Supabase 관리자 키, DB 주소, VAPID 비밀 키, 웹훅 비밀번호, clasp 토큰. 이 값들은 GitHub Secrets·Supabase·Apps Script 속성에만 있어요.
+- **비밀 값을 저장소에 넣지 않아요**: Supabase 관리자 키, DB 주소, VAPID 비밀 키, 웹훅 비밀번호, 로봇 비밀번호, clasp 토큰. 이 값들은 GitHub Secrets·Supabase·Apps Script 속성에만 있어요.
 - **회원 이메일·이름을 저장소에 넣지 않아요** (공개 저장소). 명단은 Supabase `allowlist` 표에만 있어요. 테스트에는 `example` 주소만 써요.
 - 드라이브 파일은 '링크 공개'로 바꾸지 않아요. 권한은 `syncDrivePermissions`가 명단에 맞춰요.
 - Apps Script 웹앱 주소(/exec)는 바뀌면 안 돼요. 배포는 항상 같은 배포 ID를 새 버전으로 갱신해요.

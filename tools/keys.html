@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Batang 비밀 값 만들기</title>
+<style>body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;max-width:680px;margin:40px auto;padding:0 20px;line-height:1.6;color:#213536;background:#F5FBFF}
+button{font:inherit;padding:10px 18px;border-radius:12px;border:0;background:#668485;color:#fff;font-weight:700;cursor:pointer}
+.box{background:#fff;border-radius:16px;padding:14px 16px;margin:14px 0;box-shadow:0 1px 2px rgba(33,53,54,.06)}
+.box b{display:block}.box small{color:#5E7273}
+textarea{width:100%;box-sizing:border-box;height:52px;font:13px ui-monospace,Menlo,monospace;padding:10px;border-radius:10px;border:1px solid #DCE8E9;margin:6px 0 0;resize:none}
+.warn{background:#F7EDDB;border-radius:12px;padding:12px 14px;font-size:14px}</style></head>
+<body>
+<h2>Batang 비밀 값 만들기</h2>
+<p>버튼을 누르면 <b>이 브라우저 안에서만</b> 값 네 개를 만들어요. 인터넷으로 전송되지 않아요.
+만든 값은 메모장에 잠깐 붙여 두고, 설정 가이드(SETUP.md)대로 넣은 뒤 메모장을 지우세요.</p>
+<p class="warn"><b>한 번만 만들어서 계속 써요.</b> 특히 푸시 키를 바꾸면 모든 회원이 알림을 다시 켜야 해요.
+이 페이지를 다시 열어 버튼을 누르면 다른 값이 나오니, 이미 넣은 값이 있으면 누르지 마세요.</p>
+<button id="go">한 번에 만들기</button>
+
+<div class="box"><b>① 푸시 공개 키</b><small>GitHub Variable <code>VAPID_PUBLIC_KEY</code> + Supabase Edge Function 비밀 값 <code>VAPID_PUBLIC_KEY</code> (공개돼도 괜찮아요)</small><textarea id="pub" readonly></textarea></div>
+<div class="box"><b>② 푸시 비밀 키</b><small>Supabase Edge Function 비밀 값 <code>VAPID_PRIVATE_KEY</code>에만 🔒</small><textarea id="priv" readonly></textarea></div>
+<div class="box"><b>③ 웹훅 비밀번호</b><small>Supabase Edge Function 비밀 값 <code>WEBHOOK_SECRET</code> + DB 웹훅 헤더 <code>x-webhook-secret</code> 🔒</small><textarea id="hook" readonly></textarea></div>
+<div class="box"><b>④ 로봇 비밀번호</b><small>Apps Script 스크립트 속성 <code>ROBOT_KEY</code> + 아래 SQL을 Supabase SQL Editor에서 한 번 실행 🔒</small><textarea id="robot" readonly></textarea>
+<textarea id="robotsql" readonly style="height:64px"></textarea></div>
+<p class="warn">🔒 표시는 GitHub, 카카오톡, Claude와의 대화 어디에도 붙여 넣지 마세요. 적힌 곳에만 넣어요.</p>
+<script>
+function b64u(buf){return btoa(String.fromCharCode.apply(null,new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+function rnd(n){var c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789',a=new Uint32Array(n),s='';crypto.getRandomValues(a);for(var i=0;i<n;i++)s+=c[a[i]%c.length];return s;}
+document.getElementById('go').onclick=async function(){
+  var k=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+  document.getElementById('pub').value=b64u(await crypto.subtle.exportKey('raw',k.publicKey));
+  document.getElementById('priv').value=(await crypto.subtle.exportKey('jwk',k.privateKey)).d;
+  document.getElementById('hook').value=rnd(40);
+  var r=rnd(48);document.getElementById('robot').value=r;
+  document.getElementById('robotsql').value="insert into robot_key (secret) values ('"+r+"') on conflict (id) do update set secret = excluded.secret;";
+  this.disabled=true;this.textContent='만들었어요';
+};
+</script>
+</body></html>
